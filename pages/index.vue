@@ -1,43 +1,48 @@
 <template>
   <v-container>
-
-    <h1>Investment Gold and Silver</h1>
-
-    <h2>Currency conversions</h2>
-    <table>
-      <thead>
-        <tr>
+    <v-row justify="center">
+     <h1>Investment Gold and Silver</h1>
+    </v-row>
+    <v-col align="left">
+      <h2>Precious Metal Prices</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Metal</th>
+            <th>Rate (AUD)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="(rate, metal) in metalRates" :key="metal">
+            <td >
+              {{ metal }}
+            </td>
+            <td >
+              {{ (1/rate).toLocaleString('en-AU', { style: 'currency', currency: 'AUD' }) }} 
+            </td>
+          </tr> 
+        </tbody>
+      </table>
+      <h2>Exchange Rates</h2>
+      <table>
+        <thead>
           <th>Currency</th>
-          <th>Rate</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="(rate, currency) in data.currency" :key="currency">
-          <td>
-            {{ currency }}
-          </td>
-          <td v-if="currency==='XAU' || currency ==='XAG'">
-            {{ (1/rate).toLocaleString('en-AU', { style: 'currency', currency: 'AUD' }) }} 
-          </td>
-          <td v-else>
-            {{ (rate).toLocaleString('en-AU', { style: 'currency', currency: 'AUD' }) }}
-          </td>
-        </tr> 
-      </tbody>
-    </table>
-
-    <v-btn @click="getRates()">Get Current Rates</v-btn>
-
-
-      <!-- <li v-for="(rate, currency) in data.currency" :key="currency">
-        <template v-if="currency==='XAU' || currency ==='XAG'">
-          {{ currency }}: {{ (1/rate).toLocaleString('en-AU', { style: 'currency', currency: 'AUD' }) }} / ounce
-        </template>
-        <template v-else>
-          {{ currency }}:{{ (rate).toLocaleString('en-AU', { style: 'currency', currency: 'AUD' }) }}
-        </template>
-        
-      </li> -->
+          <th>Rate (AUD)</th>
+        </thead>
+        <tbody>
+          <tr v-for="(rate, currency) in currencyRates" :key="currency">
+            <td>
+              {{ currency }}
+            </td>
+            <td>
+              {{ rate.toLocaleString('en-AU', {style: 'currency', currency:'AUD'}) }}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      
+      <v-btn @click="getRates()">Check for Updates</v-btn>
+    </v-col>
 
 
   </v-container>
@@ -45,28 +50,52 @@
 
 <script>
 import axios from 'axios';
-import { reactive } from 'vue';
+import { reactive ,computed} from 'vue';
 
 export default {
   setup(){
     let data = reactive({
-      currency: '',
-      rate: []
-    })
+      rates: {}
+    });
     const apiURL ='https://api.metalpriceapi.com/v1/latest'
     const apiKEY = 'bb7c73b07cf23654d4ee15b68926f81d'
 
     const getRates = ()=>{
-      axios(`${apiURL}?api_key=${apiKEY}&base=AUD&currencies=AUD,XAU,XAG,USD,EUR`).then(response =>{
-        console.log(response)
-        console.log(response.data.rates)
-        data.currency = response.data.rates
-      })
-    }
+      axios(`${apiURL}?api_key=${apiKEY}&base=AUD&currencies=XAU,XAG,USD,EUR`).then(response =>{
+        const rates = response.data.rates;
+        data.rates ={};
+
+        //Processing the API output
+        for(const [key, value] of Object.entries(rates)){
+          if(key.startsWith('AUD')){
+            const currency = key.replace('AUD','');
+            data.rates[currency] = value;
+          }else{
+            data.rates[key]=value;
+          }
+        }
+      });
+    };
+
+    const metalRates = computed(()=>{
+      return {
+        XAU: data.rates.XAU,
+        XAG: data.rates.XAG
+      };
+    });
+
+    const currencyRates = computed(()=>{
+        let rates ={...data.rates};
+        delete rates.XAU;
+        delete rates.XAG;
+        return rates;
+    });
 
     return {
       data,
-      getRates
+      getRates,
+      metalRates,
+      currencyRates
     }
   }
 }
