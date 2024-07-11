@@ -1,41 +1,47 @@
+
 <template>
+
   <v-container>
-    <v-row justify="center">
-     <h1>Investment Gold and Silver</h1>
-    </v-row>
-    <v-col align="left">
-      <h2>Precious Metal Prices</h2>
+    <v-col align="right">
       <table>
         <thead>
           <tr>
-            <th>Metal</th>
-            <th>Rate (AUD)</th>
+            <th style="width:33%">Metal</th>
+            <th style="width:33%">Rate (AUD)</th>
+            <th style="width:33%">Change (%)</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="(rate, metal) in metalRates" :key="metal">
-            <td >
+            <td>
               {{ metal }}
             </td>
-            <td >
-              {{ (1/rate).toLocaleString('en-AU', { style: 'currency', currency: 'AUD' }) }} 
+            <td align="right">
+              {{ (1/rate.current).toLocaleString('en-AU', { style: 'currency', currency: 'AUD' }) }} 
+            </td>
+            <td align="right">
+              {{ rate.change ? rate.change.toFixed(2): '-' }}
             </td>
           </tr> 
         </tbody>
       </table>
-      <h2>Exchange Rates</h2>
+
       <table>
         <thead>
-          <th>Currency</th>
-          <th>Rate (AUD)</th>
+          <th style="width:33%">Currency</th>
+          <th style="width:33%">Rate (AUD)</th>
+          <th style="width:33%">Change (%)</th>
         </thead>
         <tbody>
           <tr v-for="(rate, currency) in currencyRates" :key="currency">
             <td>
               {{ currency }}
             </td>
-            <td>
-              {{ rate.toLocaleString('en-AU', {style: 'currency', currency:'AUD'}) }}
+            <td align="right">
+              {{ rate.current.toLocaleString('en-AU', {style: 'currency', currency:'AUD'}) }}
+            </td>
+            <td align="right">
+              {{ rate.change ? rate.change.toFixed(2): '-' }}
             </td>
           </tr>
         </tbody>
@@ -43,44 +49,68 @@
       
       <v-btn @click="getRates()">Check for Updates</v-btn>
     </v-col>
-
-
   </v-container>
+
 </template>
 
 <script>
 import axios from 'axios';
-import { reactive ,computed} from 'vue';
+import { reactive ,computed, onMounted} from 'vue';
+import dayjs from 'dayjs';
 
 export default {
   setup(){
     let data = reactive({
-      rates: {}
+      rates: {},
+      previousRates: {},
     });
-    const apiURL ='https://api.metalpriceapi.com/v1/latest'
-    const apiKEY = 'bb7c73b07cf23654d4ee15b68926f81d'
+    
 
-    const getRates = ()=>{
-      axios(`${apiURL}?api_key=${apiKEY}&base=AUD&currencies=XAU,XAG,USD,EUR`).then(response =>{
+    const apiURL ='https://api.metalpriceapi.com/v1/';
+    const apiKEY = 'bb7c73b07cf23654d4ee15b68926f81d';
+    
+// process.env.VUE_APP_API_KEY not currently working follow up needed
+
+    const getRates = () => {
+      axios(`${apiURL}latest?api_key=${apiKEY}&base=AUD&currencies=XAU,XAG,XPD,XPT,USD,EUR,GBP,CNY`).then(response => {
         const rates = response.data.rates;
-        data.rates ={};
+        data.rates = {};
 
         //Processing the API output
         for(const [key, value] of Object.entries(rates)){
-          if(key.startsWith('AUD')){
-            const currency = key.replace('AUD','');
-            data.rates[currency] = value;
-          }else{
-            data.rates[key]=value;
-          }
+            const currency = key.startsWith('AUD') ? key.replace('AUD', ''): key;
+            data.rates[currency] = {current: value};
+
         }
+        const previousDay = dayjs().subtract(1, 'day').format('YYYY-MM-DD');
+        axios(`${apiURL}${previousDay}?api_key=${apiKEY}&base=AUD&currencies=XAU,XAG,XPD,XPT,USD,EUR,GBP,CNY`).then(response =>{
+          const previousRates = response.data.rates;
+          data.previousRates = {};
+
+          for(const [key, value] of Object.entries(previousRates)){
+
+            const currency = key.startsWith('AUD') ? key.replace('AUD', ''): key;
+              data.previousRates[currency]=value;
+          }
+
+
+          for(const key in data.rates){
+            if(data.previousRates[key]){
+                data.rates[key].change = ((data.rates[key].current -data.previousRates[key])/ data.previousRates[key])*100;
+            }
+
+          }
+        });  
       });
     };
-
+// All precious Metals in Troy ounces
+// XAU - Gold, XAG - Silver, XPD - Palladium, XPT - Platinum
     const metalRates = computed(()=>{
       return {
-        XAU: data.rates.XAU,
-        XAG: data.rates.XAG
+        XAU: data.rates.XAU ||{},
+        XAG: data.rates.XAG ||{},
+        XPD: data.rates.XPD ||{},
+        XPT: data.rates.XPT ||{}
       };
     });
 
@@ -88,8 +118,14 @@ export default {
         let rates ={...data.rates};
         delete rates.XAU;
         delete rates.XAG;
+        delete rates.XPD;
+        delete rates.XPT;
         return rates;
     });
+
+    onMounted(()=>{
+      getRates();
+    })
 
     return {
       data,
@@ -99,5 +135,4 @@ export default {
     }
   }
 }
-
 </script>
