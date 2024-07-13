@@ -2,13 +2,13 @@
 <template>
 
   <v-container>
-    <v-col align="right">
+    <v-col >
       <table>
         <thead>
           <tr>
-            <th style="width:33%">Metal</th>
-            <th style="width:33%">Rate (AUD)</th>
-            <th style="width:33%">Change (%)</th>
+            <th align="left" style="width:33%">Metal</th>
+            <th style="width:33%">Price</th>
+            <th style="width:33%">Change</th>
           </tr>
         </thead>
         <tbody>
@@ -19,8 +19,8 @@
             <td align="right">
               {{ (1/rate.current).toLocaleString('en-AU', { style: 'currency', currency: 'AUD' }) }} 
             </td>
-            <td align="right">
-              {{ rate.change ? rate.change.toFixed(2): '-' }}
+            <td :class="getChangeClass(rate.change)" align="right">
+              {{ rate.change ? rate.change.toFixed(2): '-' }} %
             </td>
           </tr> 
         </tbody>
@@ -28,9 +28,9 @@
 
       <table>
         <thead>
-          <th style="width:33%">Currency</th>
-          <th style="width:33%">Rate (AUD)</th>
-          <th style="width:33%">Change (%)</th>
+          <th align="left" style="width:33%">Currency</th>
+          <th style="width:33%">Price</th>
+          <th style="width:33%">Change</th>
         </thead>
         <tbody>
           <tr v-for="(rate, currency) in currencyRates" :key="currency">
@@ -40,22 +40,31 @@
             <td align="right">
               {{ rate.current.toLocaleString('en-AU', {style: 'currency', currency:'AUD'}) }}
             </td>
-            <td align="right">
-              {{ rate.change ? rate.change.toFixed(2): '-' }}
+            <td :class="getChangeClass(rate.change)" align="right">
+              {{ rate.change ? rate.change.toFixed(2): '-' }} %
             </td>
           </tr>
         </tbody>
+
+        
       </table>
       
       <v-btn @click="getRates()">Check for Updates</v-btn>
+      <v-select 
+        v-model="baseCurrency"
+        :items="availableCurrencies"
+        label="Change Currency"
+        outlined
+        />
     </v-col>
   </v-container>
 
 </template>
 
+
 <script>
 import axios from 'axios';
-import { reactive ,computed, onMounted} from 'vue';
+import { reactive ,computed, onMounted, ref, watch} from 'vue';
 import dayjs from 'dayjs';
 
 export default {
@@ -65,32 +74,33 @@ export default {
       previousRates: {},
     });
     
-
+    const baseCurrency = ref('AUD');
+    const availableCurrencies = ref(['AUD','USD','EUR','GBP','CNY']);
     const apiURL ='https://api.metalpriceapi.com/v1/';
-    const apiKEY = 'bb7c73b07cf23654d4ee15b68926f81d';
+    const apiKEY = import.meta.env.VITE_API_KEY;
     
-// process.env.VUE_APP_API_KEY not currently working follow up needed
 
     const getRates = () => {
-      axios(`${apiURL}latest?api_key=${apiKEY}&base=AUD&currencies=XAU,XAG,XPD,XPT,USD,EUR,GBP,CNY`).then(response => {
+      const currencies =availableCurrencies.value.filter(currency => currency !== baseCurrency.value).join(',');
+
+      axios(`${apiURL}latest?api_key=${apiKEY}&base=${baseCurrency.value}&currencies=XAU,XAG,XPD,XPT,${currencies}`).then(response => {
         const rates = response.data.rates;
         data.rates = {};
 
         //Processing the API output
         for(const [key, value] of Object.entries(rates)){
-            const currency = key.startsWith('AUD') ? key.replace('AUD', ''): key;
+            const currency = key.startsWith(baseCurrency.value) ? key.replace(baseCurrency.value, ''): key;
             data.rates[currency] = {current: value};
 
         }
         const previousDay = dayjs().subtract(1, 'day').format('YYYY-MM-DD');
-        axios(`${apiURL}${previousDay}?api_key=${apiKEY}&base=AUD&currencies=XAU,XAG,XPD,XPT,USD,EUR,GBP,CNY`).then(response =>{
+        axios(`${apiURL}${previousDay}?api_key=${apiKEY}&base=${baseCurrency.value}&currencies=XAU,XAG,XPD,XPT,${currencies}`).then(response =>{
           const previousRates = response.data.rates;
           data.previousRates = {};
 
           for(const [key, value] of Object.entries(previousRates)){
-
-            const currency = key.startsWith('AUD') ? key.replace('AUD', ''): key;
-              data.previousRates[currency]=value;
+            const currency = key.startsWith(baseCurrency.value) ? key.replace(baseCurrency.value, ''): key;
+            data.previousRates[currency]=value;
           }
 
 
@@ -123,16 +133,38 @@ export default {
         return rates;
     });
 
+    const getChangeClass =(change)=>{
+      if(change===undefined || change ===null) return '';
+      return change > 0 ? 'positive' : 'negative';
+    }
+
+
     onMounted(()=>{
       getRates();
     })
 
+    watch(baseCurrency, ()=>{
+      getRates();
+    })
+
     return {
+      baseCurrency,
+      availableCurrencies,
       data,
       getRates,
       metalRates,
-      currencyRates
+      currencyRates,
+      getChangeClass
     }
   }
 }
 </script>
+
+<style>
+.positive {
+  color: green;
+}
+.negative {
+  color: red;
+}
+</style>

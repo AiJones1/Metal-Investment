@@ -3,10 +3,13 @@
 		<v-container>
 			<v-row class="titleContainer">
 				<h1>Precious Metals Investments</h1>
-				<v-card justify="right">
+			</v-row>
+			<v-row class="accountContainer">
+				
+				<v-col align="right">
 					<v-btn>Login</v-btn>
 					<v-btn>Create Account</v-btn>
-				</v-card>
+				</v-col>
 			</v-row>
 			<v-row>
 				<v-col cols="false" md="3"></v-col>
@@ -29,7 +32,11 @@ import investment from './pages/investment.vue'
 <style scoped>
 .titleContainer {
 	justify-content: center;
+	align-items: center;
 	padding: 8px;
+	background-color: rgb(150, 150, 150);
+}
+.accountContainer {
 	background-color: rgb(150, 150, 150);
 }
 .mainContainer {
