@@ -1,44 +1,52 @@
+
 <template>
+
   <v-container>
-    <v-row justify="center">
-     <h1>Investment Gold and Silver</h1>
-    </v-row>
-    <v-col align="left">
-      <h2>Precious Metal Prices</h2>
+    <v-col >
       <table>
         <thead>
           <tr>
-            <th>Metal</th>
-            <th>Rate (AUD)</th>
+            <th align="left" style="width:33%">Metal</th>
+            <th style="width:33%">Price</th>
+            <th style="width:33%">Change</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="(rate, metal) in metalRates" :key="metal">
-            <td >
+            <td>
               {{ metal }}
             </td>
-            <td >
-              {{ (1/rate).toLocaleString('en-AU', { style: 'currency', currency: 'AUD' }) }} 
+            <td align="right">
+              {{ (1/rate.current).toLocaleString('en-AU', { style: 'currency', currency: 'AUD' }) }} 
+            </td>
+            <td :class="getChangeClass(rate.change)" align="right">
+              {{ rate.change ? rate.change.toFixed(2): '-' }} %
             </td>
           </tr> 
         </tbody>
       </table>
-      <h2>Exchange Rates</h2>
+
       <table>
         <thead>
-          <th>Currency</th>
-          <th>Rate (AUD)</th>
+          <th align="left" style="width:33%">Currency</th>
+          <th style="width:33%">Price</th>
+          <th style="width:33%">Change</th>
         </thead>
         <tbody>
           <tr v-for="(rate, currency) in currencyRates" :key="currency">
             <td>
               {{ currency }}
             </td>
-            <td>
-              {{ rate.toLocaleString('en-AU', {style: 'currency', currency:'AUD'}) }}
+            <td align="right">
+              {{ rate.current.toLocaleString('en-AU', {style: 'currency', currency:'AUD'}) }}
+            </td>
+            <td :class="getChangeClass(rate.change)" align="right">
+              {{ rate.change ? rate.change.toFixed(2): '-' }} %
             </td>
           </tr>
         </tbody>
+
+        
       </table>
       
       <v-btn @click="getCurrentRates()">Check for Updates</v-btn>
@@ -49,19 +57,21 @@
         outlined
         />
     </v-col>
-
-
   </v-container>
+
 </template>
+
 
 <script>
 import axios from 'axios';
-import { reactive ,computed} from 'vue';
+import { reactive ,computed, onMounted, ref, watch} from 'vue';
+import dayjs from 'dayjs';
 
 export default {
   setup(){
     let data = reactive({
-      rates: {}
+      rates: {},
+      previousRates: {},
     });
     
     const baseCurrency = ref('AUD');
@@ -132,8 +142,10 @@ export default {
 // XAU - Gold, XAG - Silver, XPD - Palladium, XPT - Platinum
     const metalRates = computed(()=>{
       return {
-        XAU: data.rates.XAU,
-        XAG: data.rates.XAG
+        XAU: data.rates.XAU ||{},
+        XAG: data.rates.XAG ||{},
+        XPD: data.rates.XPD ||{},
+        XPT: data.rates.XPT ||{}
       };
     });
 
@@ -141,17 +153,44 @@ export default {
         let rates ={...data.rates};
         delete rates.XAU;
         delete rates.XAG;
+        delete rates.XPD;
+        delete rates.XPT;
         return rates;
     });
 
+    const getChangeClass =(change)=>{
+      if(change===undefined || change ===null) return '';
+      return change > 0 ? 'positive' : 'negative';
+    }
+
+
+    onMounted(()=>{
+      getRates();
+    })
+
+    watch(baseCurrency, ()=>{
+      getRates();
+    })
+
     return {
+      baseCurrency,
+      availableCurrencies,
       data,
       getRates,
       getCurrentRates,
       metalRates,
-      currencyRates
+      currencyRates,
+      getChangeClass
     }
   }
 }
-
 </script>
+
+<style>
+.positive {
+  color: green;
+}
+.negative {
+  color: red;
+}
+</style>

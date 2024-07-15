@@ -1,5 +1,6 @@
 import vuetify from "vite-plugin-vuetify";
 
+
 // PWA Config
 const title = "Investment App";
 const shortTitle = "Vuetify 3 + Nuxt 3 Starter";
@@ -12,9 +13,12 @@ const url = "https://vuetify3nuxt3starter.behonbaker.com/";
 export default defineNuxtConfig({
   // import styles
   css: ["@/assets/main.scss"],
+
   // enable takeover mode
   typescript: { shim: false },
+
   build: { transpile: ["vuetify"] },
+
   modules: [
     "@kevinmarrec/nuxt-pwa",
     async (options, nuxt) => {
@@ -24,7 +28,7 @@ export default defineNuxtConfig({
       );
     },
   ],
-  
+
   app: {
     head: {
       title: "Vuetify 3 + Nuxt 3 Starter",
@@ -108,4 +112,6 @@ export default defineNuxtConfig({
       description: description,
     },
   },
+
+  compatibilityDate: "2024-07-11",
 });
