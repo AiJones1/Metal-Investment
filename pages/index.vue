@@ -41,7 +41,13 @@
         </tbody>
       </table>
       
-      <v-btn @click="getRates()">Check for Updates</v-btn>
+      <v-btn @click="getCurrentRates()">Check for Updates</v-btn>
+      <v-select 
+        v-model="baseCurrency"
+        :items="availableCurrencies"
+        label="Change Currency"
+        outlined
+        />
     </v-col>
 
 
@@ -57,26 +63,73 @@ export default {
     let data = reactive({
       rates: {}
     });
-    const apiURL ='https://api.metalpriceapi.com/v1/latest'
-    const apiKEY = 'bb7c73b07cf23654d4ee15b68926f81d'
+    
+    const baseCurrency = ref('AUD');
+    const availableCurrencies = ref(['AUD','USD','EUR','GBP','CNY']);
+    const apiURL ='https://api.metalpriceapi.com/v1/';
+    const apiKEY = import.meta.env.VITE_API_KEY;
+    let currencies =availableCurrencies.value;
+    // const metals =[
+    //   {title:'Silver', value:'XAG'},
+    //   {title:'Gold', value:'XAU'},
+    //   {title:'Platinum', value:'XPT'},
+    //   {title:'Paladium', value:'XPD'},
+    // ]
 
-    const getRates = ()=>{
-      axios(`${apiURL}?api_key=${apiKEY}&base=AUD&currencies=XAU,XAG,USD,EUR`).then(response =>{
-        const rates = response.data.rates;
-        data.rates ={};
+    const getRates = () => {
+      currencies =availableCurrencies.value.filter(currency => currency !== baseCurrency.value).join(',');
 
-        //Processing the API output
-        for(const [key, value] of Object.entries(rates)){
-          if(key.startsWith('AUD')){
-            const currency = key.replace('AUD','');
-            data.rates[currency] = value;
-          }else{
-            data.rates[key]=value;
+      axios(`${apiURL}latest?api_key=${apiKEY}&base=${baseCurrency.value}&currencies=XAU,XAG,XPD,XPT,${currencies}`).then(response => {
+        const rates =processRates(response.data.rates, baseCurrency.value, true);
+        data.rates = rates;
+
+        const previousDay = dayjs().subtract(1, 'day').format('YYYY-MM-DD');
+        axios(`${apiURL}${previousDay}?api_key=${apiKEY}&base=${baseCurrency.value}&currencies=XAU,XAG,XPD,XPT,${currencies}`).then(response =>{
+          const previousRates = processRates(response.data.rates, baseCurrency.value, false);
+          data.previousRates = previousRates;
+
+
+          for(const key in data.rates){
+            if(data.previousRates[key]){
+                data.rates[key].change = ((data.rates[key].current -data.previousRates[key])/ data.previousRates[key])*100;
+            }
+
           }
-        }
+        });  
       });
     };
 
+    const processRates =(rates,baseCurrency, isCurrent)=>{
+      const processedRates ={};
+      for(const [key, value] of Object.entries(rates)){
+            const currency = key.startsWith(baseCurrency) ? key.replace(baseCurrency, ''): key;
+            if(isCurrent){
+              processedRates[currency] = {current:value};
+            }else{
+              processedRates[currency] = value;
+            }
+            
+        }
+        return processedRates;
+    };
+
+    const getCurrentRates=()=>{
+      currencies =availableCurrencies.value.filter(currency => currency !== baseCurrency.value).join(',');
+
+      axios(`${apiURL}latest?api_key=${apiKEY}&base=${baseCurrency.value}&currencies=XAU,XAG,XPD,XPT,${currencies}`).then(response => {
+      const rates =processRates(response.data.rates, baseCurrency.value, true);
+      for(const key in rates){
+        if(data.previousRates[key]){
+          rates[key].change = ((rates[key].current-data.previousRates[key])/data.previousRates[key])*100;
+        }
+      }
+      data.rates = rates;
+    });
+  };
+      
+
+// All precious Metals in Troy ounces
+// XAU - Gold, XAG - Silver, XPD - Palladium, XPT - Platinum
     const metalRates = computed(()=>{
       return {
         XAU: data.rates.XAU,
@@ -94,6 +147,7 @@ export default {
     return {
       data,
       getRates,
+      getCurrentRates,
       metalRates,
       currencyRates
     }
